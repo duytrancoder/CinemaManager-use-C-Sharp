@@ -6,13 +6,13 @@ namespace QuanLyRapPhim
 {
     public partial class FormMain : Form
     {
-        // Chuỗi kết nối của Duy
+        // Kết nối DB
         public static string connStr = @"Data Source=DESKTOP-4PO6FDP\SSQLSERVER;Initial Catalog=QuanLyRapPhim;Integrated Security=True";
 
         public FormMain()
         {
             InitializeComponent();
-            // Mở mặc định trang Phim
+            
             OpenChildForm(new FormPhim());
             SetButtonActive(btnQuanLyPhim);
         }
@@ -36,7 +36,7 @@ namespace QuanLyRapPhim
             btnLichChieu.BackColor = Color.Transparent;
             btnBanVe.BackColor = Color.Transparent;
 
-            // Nút active màu Cam đậm chuyên nghiệp
+            // Nút active màu Cam 
             btn.BackColor = Color.FromArgb(255, 140, 0);
         }
 
@@ -44,10 +44,15 @@ namespace QuanLyRapPhim
         {
             Button btn = (Button)sender;
             SetButtonActive(btn);
-
+                
             if (btn.Text == "PHIM") OpenChildForm(new FormPhim());
             else if (btn.Text == "LỊCH CHIẾU") OpenChildForm(new FormLich());
             else if (btn.Text == "BÁN VÉ") OpenChildForm(new FormVe());
+        }
+
+        private void FormMain_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

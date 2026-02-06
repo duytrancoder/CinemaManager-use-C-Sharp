@@ -120,7 +120,8 @@
             this.Controls.Add(this.pnlMenu);
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Hệ thống quản lý rạp chiếu phim v2.0";
+            this.Text = "vvv";
+            this.Load += new System.EventHandler(this.FormMain_Load);
             this.pnlMenu.ResumeLayout(false);
             this.pnlMenu.PerformLayout();
             this.tblMenuBtn.ResumeLayout(false);

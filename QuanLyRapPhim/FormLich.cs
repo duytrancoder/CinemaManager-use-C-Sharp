@@ -10,7 +10,7 @@ namespace QuanLyRapPhim
 {
     public partial class FormLich : Form
     {
-        string originalMaLich = ""; // QUAN TRỌNG: Lưu mã lịch gốc để sửa
+        string originalMaLich = "";
 
         public FormLich()
         {
@@ -20,6 +20,7 @@ namespace QuanLyRapPhim
             LoadComboPhong();
         }
 
+        // Hàm Load dữ liệu đầy đủ
         void LoadDataLich()
         {
             try
@@ -32,21 +33,70 @@ namespace QuanLyRapPhim
                     DataTable dt = new DataTable();
                     da.Fill(dt);
                     dgvLich.DataSource = dt;
-
-                    dgvLich.Columns["MaLich"].HeaderText = "Mã Lịch";
-                    dgvLich.Columns["TenPhim"].HeaderText = "Tên Phim";
-                    dgvLich.Columns["NgayChieu"].HeaderText = "Ngày Chiếu";
-                    dgvLich.Columns["GioChieu"].HeaderText = "Giờ Chiếu";
-                    dgvLich.Columns["TenPhong"].HeaderText = "Phòng Chiếu";
-                    dgvLich.Columns["GiaVe"].HeaderText = "Giá Vé";
-
-                    dgvLich.Columns["NgayChieu"].DefaultCellStyle.Format = "dd/MM/yyyy";
-                    dgvLich.Columns["GiaVe"].DefaultCellStyle.Format = "N0";
+                    SetupGridView(); // Gọi hàm định dạng
                 }
             }
             catch (Exception ex) { MessageBox.Show("Lỗi tải lịch: " + ex.Message); }
         }
 
+        // Hàm định dạng cột (Dùng chung cho Load và Tìm kiếm)
+        void SetupGridView()
+        {
+            if (dgvLich.Columns.Contains("MaLich")) dgvLich.Columns["MaLich"].HeaderText = "Mã Lịch";
+            if (dgvLich.Columns.Contains("TenPhim")) dgvLich.Columns["TenPhim"].HeaderText = "Tên Phim";
+            if (dgvLich.Columns.Contains("NgayChieu"))
+            {
+                dgvLich.Columns["NgayChieu"].HeaderText = "Ngày Chiếu";
+                dgvLich.Columns["NgayChieu"].DefaultCellStyle.Format = "dd/MM/yyyy";
+            }
+            if (dgvLich.Columns.Contains("GioChieu")) dgvLich.Columns["GioChieu"].HeaderText = "Giờ Chiếu";
+            if (dgvLich.Columns.Contains("TenPhong")) dgvLich.Columns["TenPhong"].HeaderText = "Phòng Chiếu";
+            if (dgvLich.Columns.Contains("GiaVe"))
+            {
+                dgvLich.Columns["GiaVe"].HeaderText = "Giá Vé";
+                dgvLich.Columns["GiaVe"].DefaultCellStyle.Format = "N0";
+            }
+        }
+
+        // --- SỰ KIỆN TÌM KIẾM ---
+        private void btnTim_Click(object sender, EventArgs e)
+        {
+            string keyword = txtTimKiem.Text.Trim();
+            if (string.IsNullOrEmpty(keyword))
+            {
+                LoadDataLich(); // Nếu rỗng thì load lại tất cả
+                return;
+            }
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(FormMain.connStr))
+                {
+                    // Tìm theo Mã Lịch hoặc Tên Phim
+                    string sql = @"SELECT L.MaLich, P.TenPhim, L.NgayChieu, L.GioChieu, L.TenPhong, L.GiaVe 
+                                   FROM LichChieu L JOIN Phim P ON L.MaPhim = P.MaPhim
+                                   WHERE L.MaLich LIKE @kw OR P.TenPhim LIKE @kw";
+
+                    SqlCommand cmd = new SqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@kw", "%" + keyword + "%");
+
+                    SqlDataAdapter da = new SqlDataAdapter(cmd);
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
+                    dgvLich.DataSource = dt;
+                    SetupGridView();
+                }
+            }
+            catch (Exception ex) { MessageBox.Show("Lỗi tìm kiếm: " + ex.Message); }
+        }
+
+        private void btnHuyTim_Click(object sender, EventArgs e)
+        {
+            txtTimKiem.Clear();
+            LoadDataLich();
+        }
+
+        // --- CÁC HÀM CŨ GIỮ NGUYÊN ---
         void LoadComboPhim()
         {
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
@@ -60,16 +110,12 @@ namespace QuanLyRapPhim
             }
         }
 
-        // SỰ KIỆN MỚI: KHI CHỌN PHIM -> HIỆN ẢNH TƯƠNG ỨNG
         private void cboPhim_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (cboPhim.SelectedValue == null) return;
-            // Kiểm tra xem value có phải là DataRowView không (lúc mới load form)
             if (cboPhim.SelectedValue is DataRowView) return;
 
             string maPhim = cboPhim.SelectedValue.ToString();
-
-            // Query lấy đường dẫn ảnh của phim này
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
                 string sql = "SELECT HinhAnh FROM Phim WHERE MaPhim = @ma";
@@ -82,15 +128,10 @@ namespace QuanLyRapPhim
                     if (result != null && !string.IsNullOrEmpty(result.ToString()))
                     {
                         string path = result.ToString();
-                        if (File.Exists(path))
-                            picPoster.Image = Image.FromFile(path);
-                        else
-                            picPoster.Image = null;
+                        if (File.Exists(path)) picPoster.Image = Image.FromFile(path);
+                        else picPoster.Image = null;
                     }
-                    else
-                    {
-                        picPoster.Image = null;
-                    }
+                    else picPoster.Image = null;
                 }
                 catch { picPoster.Image = null; }
             }
@@ -101,14 +142,9 @@ namespace QuanLyRapPhim
             if (e.RowIndex >= 0)
             {
                 DataGridViewRow row = dgvLich.Rows[e.RowIndex];
-
-                // Lưu Mã Lịch gốc
                 originalMaLich = row.Cells["MaLich"].Value.ToString();
-
                 txtMaLich.Text = originalMaLich;
                 cboPhim.Text = row.Cells["TenPhim"].Value.ToString();
-                // (Khi gán Text cho cboPhim, sự kiện SelectedIndexChanged sẽ chạy và tự load ảnh)
-
                 dtpNgay.Value = Convert.ToDateTime(row.Cells["NgayChieu"].Value);
                 if (row.Cells["GioChieu"].Value != DBNull.Value)
                 {
@@ -120,57 +156,42 @@ namespace QuanLyRapPhim
             }
         }
 
-        // SỬA LỊCH: ĐÃ CẬP NHẬT LOGIC DÙNG originalMaLich
         private void btnSua_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(originalMaLich))
             {
-                MessageBox.Show("Vui lòng chọn lịch cần sửa từ bảng trước!");
+                MessageBox.Show("Vui lòng chọn lịch cần sửa!");
                 return;
             }
-
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
                 try
                 {
                     string sql = "UPDATE LichChieu SET MaLich=@newMa, MaPhim=@phim, NgayChieu=@ngay, GioChieu=@gio, TenPhong=@phong, GiaVe=@gia WHERE MaLich=@oldMa";
                     SqlCommand cmd = new SqlCommand(sql, conn);
-
-                    cmd.Parameters.AddWithValue("@newMa", txtMaLich.Text); // Mã mới
-                    cmd.Parameters.AddWithValue("@oldMa", originalMaLich); // Mã cũ (để tìm)
-
+                    cmd.Parameters.AddWithValue("@newMa", txtMaLich.Text);
+                    cmd.Parameters.AddWithValue("@oldMa", originalMaLich);
                     cmd.Parameters.AddWithValue("@phim", cboPhim.SelectedValue);
                     cmd.Parameters.AddWithValue("@ngay", dtpNgay.Value);
                     cmd.Parameters.AddWithValue("@gio", dtpGio.Value.TimeOfDay);
                     cmd.Parameters.AddWithValue("@phong", cboPhong.SelectedValue);
                     cmd.Parameters.AddWithValue("@gia", txtGiaVe.Text);
-
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
+                    conn.Open(); cmd.ExecuteNonQuery();
                     LoadDataLich();
-                    MessageBox.Show("Cập nhật lịch chiếu thành công!");
-
-                    // Cập nhật lại mã gốc
+                    MessageBox.Show("Cập nhật thành công!");
                     originalMaLich = txtMaLich.Text;
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi sửa (Có thể trùng Mã Lịch): " + ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show("Lỗi sửa: " + ex.Message); }
             }
         }
 
-        // CHỨC NĂNG LÀM MỚI (RESET)
         private void btnReload_Click(object sender, EventArgs e)
         {
-            txtMaLich.Clear();
-            txtGiaVe.Clear();
-            picPoster.Image = null; // Xóa ảnh
-            originalMaLich = ""; // Reset mã gốc
+            txtMaLich.Clear(); txtGiaVe.Clear(); picPoster.Image = null; originalMaLich = "";
+            txtTimKiem.Clear(); // Xóa cả ô tìm kiếm
             LoadDataLich();
         }
 
-        // --- Các phần giữ nguyên ---
         void LoadComboPhong()
         {
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
@@ -249,18 +270,15 @@ namespace QuanLyRapPhim
             {
                 using (SqlConnection conn = new SqlConnection(FormMain.connStr))
                 {
-                    // Xóa dựa trên MaLich đang hiển thị
                     conn.Open();
                     SqlCommand cmdDelVe = new SqlCommand("DELETE FROM Ve WHERE MaLich=@ma", conn);
                     cmdDelVe.Parameters.AddWithValue("@ma", txtMaLich.Text);
                     cmdDelVe.ExecuteNonQuery();
-
                     SqlCommand cmd = new SqlCommand("DELETE FROM LichChieu WHERE MaLich=@ma", conn);
                     cmd.Parameters.AddWithValue("@ma", txtMaLich.Text);
                     cmd.ExecuteNonQuery();
-
                     LoadDataLich();
-                    btnReload_Click(null, null); // Reset lại ô nhập
+                    btnReload_Click(null, null);
                 }
             }
         }
@@ -312,5 +330,7 @@ namespace QuanLyRapPhim
                 catch (Exception ex) { MessageBox.Show("Lỗi: " + ex.Message); }
             }
         }
+
+        private void dgvLich_CellContentClick(object sender, DataGridViewCellEventArgs e) { }
     }
 }
