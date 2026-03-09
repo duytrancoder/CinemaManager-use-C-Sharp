@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
+using System.IO; // Thêm thư viện IO để check file ảnh
 using System.Windows.Forms;
 
 namespace QuanLyRapPhim
@@ -41,20 +42,36 @@ namespace QuanLyRapPhim
             catch (Exception ex) { MessageBox.Show("Lỗi tải phim: " + ex.Message); }
         }
 
-        // 2. CHỈNH SỬA: Format Ngày hiển thị (dd/MM/yyyy)
         private void cboPhim_SelectedIndexChanged(object sender, EventArgs e)
         {
             cboNgay.DataSource = null; cboGio.DataSource = null;
             flpGhe.Controls.Clear(); lblGiaVe.Text = "Giá vé: 0 VNĐ";
             listGheDangChon.Clear(); UpdateTongTien();
+            picPoster.Image = null; // Reset ảnh khi đổi phim
 
             if (cboPhim.SelectedIndex == -1) return;
-            // Bỏ qua nếu đang load form (tránh lỗi DataRowView)
             if (cboPhim.SelectedValue is DataRowView) return;
 
             string maPhim = cboPhim.SelectedValue.ToString();
+
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
+                // --- LOAD ẢNH PHIM ĐƯA LÊN GIAO DIỆN BÊN PHẢI ---
+                try
+                {
+                    conn.Open();
+                    SqlCommand cmdImg = new SqlCommand("SELECT HinhAnh FROM Phim WHERE MaPhim = @ma", conn);
+                    cmdImg.Parameters.AddWithValue("@ma", maPhim);
+                    object res = cmdImg.ExecuteScalar();
+                    if (res != null && File.Exists(res.ToString()))
+                    {
+                        picPoster.Image = Image.FromFile(res.ToString());
+                    }
+                    conn.Close();
+                }
+                catch { picPoster.Image = null; }
+
+                // --- LOAD CÁC NGÀY CHIẾU ---
                 string sql = @"SELECT DISTINCT NgayChieu FROM LichChieu 
                                WHERE MaPhim = @ma AND NgayChieu >= CAST(GETDATE() AS DATE) ORDER BY NgayChieu";
                 SqlCommand cmd = new SqlCommand(sql, conn);
@@ -63,17 +80,15 @@ namespace QuanLyRapPhim
                 DataTable dt = new DataTable();
                 da.Fill(dt);
 
-                // --- SỬA Ở ĐÂY: Tạo cột hiển thị riêng ---
                 dt.Columns.Add("NgayHienThi", typeof(string));
                 foreach (DataRow row in dt.Rows)
                 {
-                    // Ép kiểu DateTime sang chuỗi chỉ có ngày
                     row["NgayHienThi"] = Convert.ToDateTime(row["NgayChieu"]).ToString("dd/MM/yyyy");
                 }
 
                 cboNgay.DataSource = dt;
-                cboNgay.DisplayMember = "NgayHienThi"; // Hiện chuỗi sạch (15/02/2026)
-                cboNgay.ValueMember = "NgayChieu";     // Giá trị ngầm vẫn là DateTime gốc
+                cboNgay.DisplayMember = "NgayHienThi";
+                cboNgay.ValueMember = "NgayChieu";
                 cboNgay.SelectedIndex = -1;
             }
         }
@@ -84,10 +99,9 @@ namespace QuanLyRapPhim
             listGheDangChon.Clear(); UpdateTongTien();
 
             if (cboNgay.SelectedIndex == -1) return;
-            if (cboNgay.SelectedValue is DataRowView) return; // Check an toàn
+            if (cboNgay.SelectedValue is DataRowView) return;
 
             string maPhim = cboPhim.SelectedValue.ToString();
-            // Lấy ValueMember (là NgayChieu gốc) để query chính xác
             DateTime ngay = Convert.ToDateTime(cboNgay.SelectedValue);
 
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
@@ -100,7 +114,6 @@ namespace QuanLyRapPhim
                 DataTable dt = new DataTable();
                 da.Fill(dt);
 
-                // Format Giờ hiển thị (hh:mm)
                 dt.Columns.Add("GioHienThi", typeof(string));
                 foreach (DataRow row in dt.Rows)
                 {
@@ -130,7 +143,6 @@ namespace QuanLyRapPhim
             LoadGhe(currentMaLich);
         }
 
-        // Vẽ ghế 3 dãy (A, B... I) và (1..12)
         void LoadGhe(string maLich)
         {
             List<string> gheDaBan = new List<string>();
@@ -143,11 +155,10 @@ namespace QuanLyRapPhim
                 while (dr.Read()) gheDaBan.Add(dr["SoGhe"].ToString());
             }
 
-            // Sơ đồ: 9 Hàng (A -> I), 12 Cột
             for (int i = 0; i < 9; i++)
             {
-                char rowChar = (char)('A' + i); // A, B, C...
-                for (int j = 1; j <= 12; j++) // 12 Cột
+                char rowChar = (char)('A' + i);
+                for (int j = 1; j <= 12; j++)
                 {
                     Button btn = new Button();
                     string gheName = rowChar + j.ToString();
@@ -156,7 +167,6 @@ namespace QuanLyRapPhim
                     btn.FlatStyle = FlatStyle.Flat;
                     btn.FlatAppearance.BorderSize = 1;
 
-                    // Tạo lối đi sau ghế số 4 và số 8
                     int rightMargin = 5;
                     if (j == 4 || j == 8) rightMargin = 50;
                     btn.Margin = new Padding(5, 5, rightMargin, 5);
@@ -173,16 +183,9 @@ namespace QuanLyRapPhim
                         btn.Click += BtnGhe_Click;
                     }
                     flpGhe.Controls.Add(btn);
-                    if (j == 12) flpGhe.SetFlowBreak(btn, true); // Xuống dòng
+                    if (j == 12) flpGhe.SetFlowBreak(btn, true);
                 }
             }
-        }
-
-        private void pnlScreen_Paint(object sender, PaintEventArgs e)
-        {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            Pen pen = new Pen(Color.DeepPink, 4);
-            e.Graphics.DrawArc(pen, 50, 10, pnlScreen.Width - 100, 60, 190, 160);
         }
 
         private void BtnGhe_Click(object sender, EventArgs e)
@@ -211,7 +214,6 @@ namespace QuanLyRapPhim
         {
             if (listGheDangChon.Count == 0) { MessageBox.Show("Vui lòng chọn ghế!"); return; }
 
-            // 1. Lưu vào Database
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
                 conn.Open();
@@ -226,7 +228,6 @@ namespace QuanLyRapPhim
             }
             MessageBox.Show("Thanh toán thành công!");
 
-            // 2. Đổi màu ghế trực tiếp trên màn hình (Không load lại gây chớp)
             foreach (Control c in flpGhe.Controls)
             {
                 Button btn = c as Button;
@@ -238,7 +239,6 @@ namespace QuanLyRapPhim
                 }
             }
 
-            // 3. Reset
             listGheDangChon.Clear();
             UpdateTongTien();
         }

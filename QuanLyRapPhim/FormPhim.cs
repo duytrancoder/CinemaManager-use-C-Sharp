@@ -4,7 +4,7 @@ using System.Data.SqlClient;
 using System.Drawing;
 using System.Windows.Forms;
 using System.IO;
-using System.Runtime.InteropServices; // Để dùng Marshal
+using System.Runtime.InteropServices;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace QuanLyRapPhim
@@ -20,6 +20,23 @@ namespace QuanLyRapPhim
             LoadData();
         }
 
+        private void FormPhim_Load(object sender, EventArgs e)
+        {
+            // Mặc định chọn "Tất cả" khi mở form
+            cboLoaiTimKiem.SelectedIndex = 0;
+
+            // Tối ưu UI cho bảng DataGridView (Màu tối cho header, màu xanh khi chọn)
+            dgvPhim.EnableHeadersVisualStyles = false;
+            dgvPhim.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(52, 58, 64);
+            dgvPhim.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dgvPhim.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            dgvPhim.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+
+            dgvPhim.DefaultCellStyle.SelectionBackColor = Color.FromArgb(0, 122, 204); // Màu xanh dương trầm
+            dgvPhim.DefaultCellStyle.SelectionForeColor = Color.White;
+            dgvPhim.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245); // Dòng xám nhạt xen kẽ
+        }
+
         // --- 1. TẢI DỮ LIỆU ---
         void LoadData()
         {
@@ -27,7 +44,7 @@ namespace QuanLyRapPhim
             {
                 using (SqlConnection conn = new SqlConnection(FormMain.connStr))
                 {
-                    string sql = "SELECT * FROM Phim";
+                    string sql = "SELECT * FROM Phim ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
                     SqlDataAdapter da = new SqlDataAdapter(sql, conn);
                     DataTable dt = new DataTable();
                     da.Fill(dt);
@@ -38,17 +55,49 @@ namespace QuanLyRapPhim
             catch (Exception ex) { MessageBox.Show("Lỗi kết nối: " + ex.Message); }
         }
 
+        // --- HÀM ĐÃ ĐƯỢC CẬP NHẬT ĐỂ CĂN GIỮA ---
         void SetupGridView()
         {
-            if (dgvPhim.Columns.Contains("HinhAnh")) dgvPhim.Columns["HinhAnh"].Visible = false; // Ẩn trên Form
-            if (dgvPhim.Columns.Contains("MaPhim")) dgvPhim.Columns["MaPhim"].HeaderText = "Mã Phim";
-            if (dgvPhim.Columns.Contains("TenPhim")) dgvPhim.Columns["TenPhim"].HeaderText = "Tên Phim";
-            if (dgvPhim.Columns.Contains("ThoiLuong")) dgvPhim.Columns["ThoiLuong"].HeaderText = "Thời Lượng (Phút)";
-            if (dgvPhim.Columns.Contains("DaoDien")) dgvPhim.Columns["DaoDien"].HeaderText = "Đạo Diễn";
-            if (dgvPhim.Columns.Contains("TheLoai")) dgvPhim.Columns["TheLoai"].HeaderText = "Thể Loại";
+            if (dgvPhim.Columns.Contains("HinhAnh"))
+                dgvPhim.Columns["HinhAnh"].Visible = false;
+
+            if (dgvPhim.Columns.Contains("MaPhim"))
+            {
+                dgvPhim.Columns["MaPhim"].HeaderText = "Mã Phim";
+                // Căn giữa nội dung và tiêu đề
+                dgvPhim.Columns["MaPhim"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvPhim.Columns["MaPhim"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            if (dgvPhim.Columns.Contains("TenPhim"))
+            {
+                dgvPhim.Columns["TenPhim"].HeaderText = "Tên Phim";
+                // Căn giữa tiêu đề (Nội dung vẫn để mặc định căn trái cho dễ đọc tên dài)
+                dgvPhim.Columns["TenPhim"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            if (dgvPhim.Columns.Contains("ThoiLuong"))
+            {
+                dgvPhim.Columns["ThoiLuong"].HeaderText = "Thời Lượng (Phút)";
+                // Căn giữa nội dung và tiêu đề
+                dgvPhim.Columns["ThoiLuong"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvPhim.Columns["ThoiLuong"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
+
+            if (dgvPhim.Columns.Contains("DaoDien"))
+            {
+                dgvPhim.Columns["DaoDien"].HeaderText = "Đạo Diễn";
+            }
+
+            if (dgvPhim.Columns.Contains("TheLoai"))
+            {
+                dgvPhim.Columns["TheLoai"].HeaderText = "Thể Loại";
+                // Căn giữa tiêu đề (Nội dung để mặc định bên trái)
+                dgvPhim.Columns["TheLoai"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
         }
 
-        // --- 2. XUẤT EXCEL (ĐÃ SỬA: XUẤT CẢ CỘT HÌNH ẢNH) ---
+        // --- 2. XUẤT EXCEL ---
         private void btnExcel_Click(object sender, EventArgs e)
         {
             if (dgvPhim.Rows.Count == 0) return;
@@ -67,67 +116,45 @@ namespace QuanLyRapPhim
                     app = new Excel.Application();
                     wb = app.Workbooks.Add(Type.Missing);
                     ws = (Excel.Worksheet)wb.Sheets[1];
-
                     int colIndex = 1;
 
-                    // 1. XUẤT TIÊU ĐỀ CỘT
                     for (int i = 0; i < dgvPhim.Columns.Count; i++)
                     {
-                        // Sửa điều kiện: Xuất nếu cột hiện HOẶC là cột HinhAnh
                         if (dgvPhim.Columns[i].Visible || dgvPhim.Columns[i].Name == "HinhAnh")
                         {
-                            if (dgvPhim.Columns[i].Name == "HinhAnh")
-                                ws.Cells[1, colIndex] = "Đường dẫn ảnh"; // Đặt tên tiêu đề cho đẹp
-                            else
-                                ws.Cells[1, colIndex] = dgvPhim.Columns[i].HeaderText;
+                            if (dgvPhim.Columns[i].Name == "HinhAnh") ws.Cells[1, colIndex] = "Đường dẫn ảnh";
+                            else ws.Cells[1, colIndex] = dgvPhim.Columns[i].HeaderText;
 
                             ws.Cells[1, colIndex].Font.Bold = true;
-                            ws.Cells[1, colIndex].Interior.Color = Color.LightYellow; // Tô màu nền tiêu đề
+                            ws.Cells[1, colIndex].Interior.Color = Color.LightYellow;
                             colIndex++;
                         }
                     }
 
-                    // 2. XUẤT DỮ LIỆU DÒNG
                     for (int i = 0; i < dgvPhim.Rows.Count; i++)
                     {
                         colIndex = 1;
                         for (int j = 0; j < dgvPhim.Columns.Count; j++)
                         {
-                            // Sửa điều kiện tương tự: Xuất nếu cột hiện HOẶC là cột HinhAnh
                             if (dgvPhim.Columns[j].Visible || dgvPhim.Columns[j].Name == "HinhAnh")
                             {
                                 if (dgvPhim.Rows[i].Cells[j].Value != null)
-                                {
-                                    // Thêm dấu ' trước dữ liệu để tránh lỗi định dạng Excel (đặc biệt với số 0 ở đầu)
                                     ws.Cells[i + 2, colIndex] = "'" + dgvPhim.Rows[i].Cells[j].Value.ToString();
-                                }
                                 colIndex++;
                             }
                         }
                     }
 
-                    ws.Columns.AutoFit(); // Tự động dãn cột
+                    ws.Columns.AutoFit();
                     wb.SaveAs(sfd.FileName);
                     MessageBox.Show("Xuất Excel thành công!", "Thông báo");
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi xuất Excel: " + ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show("Lỗi xuất Excel: " + ex.Message); }
                 finally
                 {
-                    // Dọn dẹp bộ nhớ
                     if (ws != null) Marshal.ReleaseComObject(ws);
-                    if (wb != null)
-                    {
-                        wb.Close(false); // Đóng không save lại lần nữa
-                        Marshal.ReleaseComObject(wb);
-                    }
-                    if (app != null)
-                    {
-                        app.Quit();
-                        Marshal.ReleaseComObject(app);
-                    }
+                    if (wb != null) { wb.Close(false); Marshal.ReleaseComObject(wb); }
+                    if (app != null) { app.Quit(); Marshal.ReleaseComObject(app); }
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
                 }
@@ -162,7 +189,6 @@ namespace QuanLyRapPhim
                     using (SqlConnection conn = new SqlConnection(FormMain.connStr))
                     {
                         conn.Open();
-                        // Bắt đầu đọc từ dòng 2
                         for (int i = 2; i <= rowCount; i++)
                         {
                             try
@@ -177,13 +203,11 @@ namespace QuanLyRapPhim
                                 if (string.IsNullOrEmpty(ma) || string.IsNullOrEmpty(ten))
                                     continue;
 
-                                // Check trùng mã
                                 string checkSql = "SELECT COUNT(*) FROM Phim WHERE MaPhim = @ma";
                                 using (SqlCommand checkCmd = new SqlCommand(checkSql, conn))
                                 {
                                     checkCmd.Parameters.AddWithValue("@ma", ma);
-                                    int count = (int)checkCmd.ExecuteScalar();
-                                    if (count > 0)
+                                    if ((int)checkCmd.ExecuteScalar() > 0)
                                     {
                                         errorCount++;
                                         duplicateCodes += ma + ", ";
@@ -194,9 +218,7 @@ namespace QuanLyRapPhim
                                 int thoiLuong = 0;
                                 int.TryParse(tlStr, out thoiLuong);
 
-                                string sql = "INSERT INTO Phim (MaPhim, TenPhim, ThoiLuong, TheLoai, DaoDien, HinhAnh) " +
-                                             "VALUES (@ma, @ten, @tl, @tlai, @dd, @anh)";
-
+                                string sql = "INSERT INTO Phim (MaPhim, TenPhim, ThoiLuong, TheLoai, DaoDien, HinhAnh) VALUES (@ma, @ten, @tl, @tlai, @dd, @anh)";
                                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                                 {
                                     cmd.Parameters.AddWithValue("@ma", ma);
@@ -218,18 +240,12 @@ namespace QuanLyRapPhim
                     {
                         msg += $"\n- Lỗi/Trùng mã: {errorCount}";
                         if (!string.IsNullOrEmpty(duplicateCodes))
-                        {
-                            duplicateCodes = duplicateCodes.TrimEnd(',', ' ');
-                            msg += $"\n- Các mã bị trùng: {duplicateCodes}";
-                        }
+                            msg += $"\n- Các mã bị trùng: {duplicateCodes.TrimEnd(',', ' ')}";
                     }
-                    MessageBox.Show(msg, "Kết quả Import");
+                    MessageBox.Show(msg, "Kết quả Import", MessageBoxButtons.OK, errorCount > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
                     LoadData();
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi đọc file Excel: " + ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show("Lỗi đọc file Excel: " + ex.Message); }
                 finally
                 {
                     if (xlRange != null) Marshal.ReleaseComObject(xlRange);
@@ -247,11 +263,33 @@ namespace QuanLyRapPhim
         {
             string keyword = txtTimKiem.Text.Trim();
             if (string.IsNullOrEmpty(keyword)) { LoadData(); return; }
+
+            string tieuChi = cboLoaiTimKiem.Text;
+            string sql = "";
+
+            switch (tieuChi)
+            {
+                case "Mã Phim":
+                    sql = "SELECT * FROM Phim WHERE MaPhim LIKE @kw ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
+                    break;
+                case "Tên Phim":
+                    sql = "SELECT * FROM Phim WHERE TenPhim LIKE @kw ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
+                    break;
+                case "Thể loại":
+                    sql = "SELECT * FROM Phim WHERE TheLoai LIKE @kw ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
+                    break;
+                case "Đạo diễn":
+                    sql = "SELECT * FROM Phim WHERE DaoDien LIKE @kw ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
+                    break;
+                default:
+                    sql = "SELECT * FROM Phim WHERE MaPhim LIKE @kw OR TenPhim LIKE @kw OR TheLoai LIKE @kw OR DaoDien LIKE @kw ORDER BY CAST(REPLACE(MaPhim, 'P', '') AS INT)";
+                    break;
+            }
+
             try
             {
                 using (SqlConnection conn = new SqlConnection(FormMain.connStr))
                 {
-                    string sql = "SELECT * FROM Phim WHERE MaPhim LIKE @kw OR TenPhim LIKE @kw OR TheLoai LIKE @kw OR DaoDien LIKE @kw";
                     SqlCommand cmd = new SqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@kw", "%" + keyword + "%");
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
@@ -259,6 +297,8 @@ namespace QuanLyRapPhim
                     da.Fill(dt);
                     dgvPhim.DataSource = dt;
                     SetupGridView();
+
+                    if (dt.Rows.Count == 0) MessageBox.Show("Không tìm thấy kết quả phù hợp!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex) { MessageBox.Show("Lỗi tìm kiếm: " + ex.Message); }
@@ -300,7 +340,7 @@ namespace QuanLyRapPhim
 
         private void btnThem_Click(object sender, EventArgs e)
         {
-            if (txtMaPhim.Text == "" || txtTenPhim.Text == "") { MessageBox.Show("Vui lòng nhập đủ thông tin!"); return; }
+            if (txtMaPhim.Text == "" || txtTenPhim.Text == "") { MessageBox.Show("Vui lòng nhập đủ thông tin!", "Nhắc nhở", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
                 try
@@ -324,7 +364,7 @@ namespace QuanLyRapPhim
                     cmd.Parameters.AddWithValue("@anh", pathAnh);
                     cmd.ExecuteNonQuery();
                     LoadData();
-                    MessageBox.Show("Thêm thành công!");
+                    MessageBox.Show("Thêm thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex) { MessageBox.Show("Lỗi: " + ex.Message); }
             }
@@ -332,7 +372,7 @@ namespace QuanLyRapPhim
 
         private void btnSua_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(originalMaPhim)) { MessageBox.Show("Vui lòng chọn phim cần sửa!"); return; }
+            if (string.IsNullOrEmpty(originalMaPhim)) { MessageBox.Show("Vui lòng chọn phim cần sửa!", "Nhắc nhở", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             using (SqlConnection conn = new SqlConnection(FormMain.connStr))
             {
                 try
@@ -361,7 +401,7 @@ namespace QuanLyRapPhim
                     cmd.Parameters.AddWithValue("@anh", pathAnh);
                     conn.Open(); cmd.ExecuteNonQuery();
                     LoadData();
-                    MessageBox.Show("Cập nhật thành công!");
+                    MessageBox.Show("Cập nhật thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     originalMaPhim = txtMaPhim.Text;
                 }
                 catch (Exception ex) { MessageBox.Show("Lỗi: " + ex.Message); }
@@ -371,7 +411,7 @@ namespace QuanLyRapPhim
         private void btnXoa_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(txtMaPhim.Text)) return;
-            if (MessageBox.Show("Xóa phim này?", "Cảnh báo", MessageBoxButtons.YesNo) == DialogResult.Yes)
+            if (MessageBox.Show("Xóa phim này?", "Cảnh báo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 using (SqlConnection conn = new SqlConnection(FormMain.connStr))
                 {
@@ -390,11 +430,8 @@ namespace QuanLyRapPhim
             txtMaPhim.Clear(); txtTenPhim.Clear(); numThoiLuong.Value = 0;
             txtTheLoai.Clear(); txtDaoDien.Clear();
             picPoster.Image = null; pathAnh = ""; originalMaPhim = "";
-            txtTimKiem.Clear();
+            txtTimKiem.Clear(); cboLoaiTimKiem.SelectedIndex = 0;
             LoadData();
         }
-
-        private void groupBoxInfo_Enter(object sender, EventArgs e) { }
-        private void FormPhim_Load(object sender, EventArgs e) { }
     }
 }

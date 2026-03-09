@@ -46,7 +46,7 @@
             this.tblMenuBtn.Controls.Add(this.btnQuanLyPhim, 0, 0);
             this.tblMenuBtn.Controls.Add(this.btnLichChieu, 1, 0);
             this.tblMenuBtn.Controls.Add(this.btnBanVe, 2, 0);
-            this.tblMenuBtn.Location = new System.Drawing.Point(380, 0);
+            this.tblMenuBtn.Location = new System.Drawing.Point(430, 0); // Đã đẩy dịch sang phải để không trùng chữ
             this.tblMenuBtn.Name = "tblMenuBtn";
             this.tblMenuBtn.RowCount = 1;
             this.tblMenuBtn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 85F));
@@ -96,10 +96,10 @@
             // 
             this.lblLogo.AutoSize = true;
             this.lblLogo.Font = new System.Drawing.Font("Segoe UI", 20F, System.Drawing.FontStyle.Bold);
-            this.lblLogo.ForeColor = System.Drawing.Color.Gold;
+            this.lblLogo.ForeColor = System.Drawing.Color.DeepSkyBlue;
             this.lblLogo.Location = new System.Drawing.Point(10, 20);
             this.lblLogo.Name = "lblLogo";
-            this.lblLogo.Size = new System.Drawing.Size(335, 46);
+            this.lblLogo.Size = new System.Drawing.Size(326, 46);
             this.lblLogo.TabIndex = 1;
             this.lblLogo.Text = "CINEMA MANAGER";
             // 
@@ -110,6 +110,7 @@
             this.pnlContent.Name = "pnlContent";
             this.pnlContent.Size = new System.Drawing.Size(1257, 662);
             this.pnlContent.TabIndex = 0;
+            this.pnlContent.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlContent_Paint);
             // 
             // FormMain
             // 
@@ -120,7 +121,7 @@
             this.Controls.Add(this.pnlMenu);
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "vvv";
+            this.Text = "Quản Lý Rạp Phim";
             this.Load += new System.EventHandler(this.FormMain_Load);
             this.pnlMenu.ResumeLayout(false);
             this.pnlMenu.PerformLayout();
